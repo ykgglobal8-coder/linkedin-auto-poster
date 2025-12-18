@@ -2,14 +2,13 @@
 """
 LinkedIn Auto Poster for Indian Business Trends
 Posts daily at 9:00 AM IST
-Author: Your Name
 """
 
 import os
 import json
 import requests
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 import google.generativeai as genai
@@ -28,80 +27,44 @@ class LinkedInAutoPoster:
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         })
-        
-def get_indian_business_trends(self):
-    """Get trending business topics in India using Google Trends"""
-    try:
-        # Import pytrends here to avoid import errors if not installed
-        from pytrends.request import TrendReq
-        
-        # Initialize pytrends
-        pytrends = TrendReq(hl='en-IN', tz=330)
-        
-        # Get trending searches for India
-        trending_searches = pytrends.trending_searches(pn='india')
-        
-        # Convert to list and filter for business topics
-        business_keywords = ['stock', 'market', 'business', 'economy', 
-                           'finance', 'startup', 'investment', 'rupee',
-                           'sensex', 'nifty', 'company', 'IPO', 'GDP',
-                           'bank', 'trade', 'export', 'import', 'digital']
-        
-        trends = []
-        for search in trending_searches[0].tolist()[:10]:  # Top 10 trends
-            if any(keyword in str(search).lower() for keyword in business_keywords):
-                trends.append({
-                    'title': search,
-                    'traffic': 'Trending in India',
-                    'articles': []
-                })
-        
-        return trends[:3] if trends else [{'title': 'Indian Business Trends', 'traffic': 'Daily update', 'articles': []}]
-        
-    except Exception as e:
-        print(f"Error fetching trends with pytrends: {e}")
-        
-        # Fallback trends
-        return [
-            {'title': 'Indian Stock Market', 'traffic': 'Trending', 'articles': []},
-            {'title': 'Startup Ecosystem', 'traffic': 'Growing', 'articles': []}
-                ]
-            if response.status_code == 200:
-                # Google Trends returns JSONP, need to clean it
-                content = response.text[5:]  # Remove )]}'\n
-                data = json.loads(content)
-                
-                # Extract trending searches
-                trends = []
-                for day in data.get('default', {}).get('trendingSearchesDays', []):
-                    for search in day.get('trendingSearches', []):
-                        title = search.get('title', {}).get('query', '')
-                        formatted_traffic = search.get('formattedTraffic', '')
-                        
-                        # Filter for business-related trends
-                        business_keywords = ['stock', 'market', 'business', 'economy', 
-                                           'finance', 'startup', 'investment', 'rupee',
-                                           'sensex', 'nifty', 'company', 'IPO', 'GDP',
-                                           'bank', 'trade', 'export', 'import', 'digital']
-                        
-                        if any(keyword in title.lower() for keyword in business_keywords):
-                            trends.append({
-                                'title': title,
-                                'traffic': formatted_traffic,
-                                'articles': search.get('articles', [])[:2]  # First 2 articles
-                            })
-                
-                return trends[:3]  # Return top 3 business trends
-                
+    
+    def get_indian_business_trends(self):
+        """Get trending business topics in India using Google Trends"""
+        try:
+            # Import pytrends here to avoid import errors if not installed
+            from pytrends.request import TrendReq
+            
+            # Initialize pytrends
+            pytrends = TrendReq(hl='en-IN', tz=330)
+            
+            # Get trending searches for India
+            trending_searches = pytrends.trending_searches(pn='india')
+            
+            # Convert to list and filter for business topics
+            business_keywords = ['stock', 'market', 'business', 'economy', 
+                               'finance', 'startup', 'investment', 'rupee',
+                               'sensex', 'nifty', 'company', 'IPO', 'GDP',
+                               'bank', 'trade', 'export', 'import', 'digital']
+            
+            trends = []
+            for search in trending_searches[0].tolist()[:10]:  # Top 10 trends
+                if any(keyword in str(search).lower() for keyword in business_keywords):
+                    trends.append({
+                        'title': search,
+                        'traffic': 'Trending in India',
+                        'articles': []
+                    })
+            
+            return trends[:3] if trends else [{'title': 'Indian Business Trends', 'traffic': 'Daily update', 'articles': []}]
+            
         except Exception as e:
-            print(f"Error fetching trends: {e}")
-        
-        # Fallback trends if API fails
-        return [
-            {'title': 'Indian Stock Market Trends', 'traffic': '100K+ searches', 'articles': []},
-            {'title': 'Startup Funding in India', 'traffic': '50K+ searches', 'articles': []},
-            {'title': 'Digital Economy Growth', 'traffic': '30K+ searches', 'articles': []}
-        ]
+            print(f"Error fetching trends with pytrends: {e}")
+            
+            # Fallback trends
+            return [
+                {'title': 'Indian Stock Market', 'traffic': 'Trending', 'articles': []},
+                {'title': 'Startup Ecosystem', 'traffic': 'Growing', 'articles': []}
+            ]
     
     def generate_linkedin_content(self, trend):
         """Generate LinkedIn post using Gemini AI"""
@@ -237,16 +200,16 @@ def get_indian_business_trends(self):
         try:
             # Step 1: Initialize upload
             init_url = "https://api.linkedin.com/v2/assets?action=registerUpload"
-           init_payload = {
-    "registerUploadRequest": {
-        "recipes": ["urn:li:digitalmediaRecipe:feedshare-image"],
-        "owner": f"urn:li:person:{LINKEDIN_PERSON_URN}",  # ← Updated line
-        "serviceRelationships": [{
-            "relationshipType": "OWNER",
-            "identifier": "urn:li:userGeneratedContent"
-        }]
-    }
-}
+            init_payload = {
+                "registerUploadRequest": {
+                    "recipes": ["urn:li:digitalmediaRecipe:feedshare-image"],
+                    "owner": f"urn:li:person:{LINKEDIN_PERSON_URN}",
+                    "serviceRelationships": [{
+                        "relationshipType": "OWNER",
+                        "identifier": "urn:li:userGeneratedContent"
+                    }]
+                }
+            }
             
             headers = {
                 "Authorization": f"Bearer {LINKEDIN_TOKEN}",
@@ -290,7 +253,7 @@ def get_indian_business_trends(self):
             url = "https://api.linkedin.com/v2/ugcPosts"
             
             payload = {
-                "author": f"urn:li:person:{LINKEDIN_PERSON_URN}"
+                "author": f"urn:li:person:{LINKEDIN_PERSON_URN}",
                 "lifecycleState": "PUBLISHED",
                 "specificContent": {
                     "com.linkedin.ugc.ShareContent": {
@@ -335,27 +298,6 @@ def get_indian_business_trends(self):
             print(f"Error posting to LinkedIn: {e}")
             return False
     
-    def send_telegram_notification(self, success, trend_title):
-        """Send notification to Telegram (optional)"""
-        telegram_token = os.getenv('TELEGRAM_BOT_TOKEN')
-        chat_id = os.getenv('TELEGRAM_CHAT_ID')
-        
-        if telegram_token and chat_id:
-            try:
-                message = f"{'✅' if success else '❌'} LinkedIn Auto-Post\n\n"
-                message += f"Trend: {trend_title}\n"
-                message += f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-                message += f"Status: {'SUCCESS' if success else 'FAILED'}"
-                
-                url = f"https://api.telegram.org/bot{telegram_token}/sendMessage"
-                requests.post(url, json={
-                    'chat_id': chat_id,
-                    'text': message,
-                    'parse_mode': 'HTML'
-                })
-            except:
-                pass  # Silent fail for notifications
-    
     def run(self):
         """Main execution function"""
         print("=" * 50)
@@ -395,10 +337,6 @@ def get_indian_business_trends(self):
         # 5. Post to LinkedIn
         print("\n🚀 Posting to LinkedIn...")
         success = self.post_to_linkedin(content, image_urn)
-        
-        # 6. Send notification
-        print("\n📱 Sending notifications...")
-        self.send_telegram_notification(success, selected_trend['title'])
         
         print("\n" + "=" * 50)
         print(f"Process completed: {'SUCCESS' if success else 'FAILED'}")
