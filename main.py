@@ -214,16 +214,16 @@ class LinkedInAutoPoster:
         try:
             # Step 1: Initialize upload
             init_url = "https://api.linkedin.com/v2/assets?action=registerUpload"
-            init_payload = {
-                "registerUploadRequest": {
-                    "recipes": ["urn:li:digitalmediaRecipe:feedshare-image"],
-                    "owner": LINKEDIN_PERSON_URN,
-                    "serviceRelationships": [{
-                        "relationshipType": "OWNER",
-                        "identifier": "urn:li:userGeneratedContent"
-                    }]
-                }
-            }
+           init_payload = {
+    "registerUploadRequest": {
+        "recipes": ["urn:li:digitalmediaRecipe:feedshare-image"],
+        "owner": f"urn:li:person:{LINKEDIN_PERSON_URN}",  # ← Updated line
+        "serviceRelationships": [{
+            "relationshipType": "OWNER",
+            "identifier": "urn:li:userGeneratedContent"
+        }]
+    }
+}
             
             headers = {
                 "Authorization": f"Bearer {LINKEDIN_TOKEN}",
@@ -267,7 +267,7 @@ class LinkedInAutoPoster:
             url = "https://api.linkedin.com/v2/ugcPosts"
             
             payload = {
-                "author": LINKEDIN_PERSON_URN,
+                "author": f"urn:li:person:{LINKEDIN_PERSON_URN}"
                 "lifecycleState": "PUBLISHED",
                 "specificContent": {
                     "com.linkedin.ugc.ShareContent": {
