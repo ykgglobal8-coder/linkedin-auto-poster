@@ -1,0 +1,405 @@
+#!/usr/bin/env python3
+"""
+LinkedIn Auto Poster for Indian Business Trends
+Posts daily at 9:00 AM IST
+Author: Your Name
+"""
+
+import os
+import json
+import requests
+import sys
+from datetime import datetime, timedelta
+from io import BytesIO
+from PIL import Image, ImageDraw, ImageFont
+import google.generativeai as genai
+
+# Configure Gemini AI
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+genai.configure(api_key=GEMINI_API_KEY)
+
+# LinkedIn credentials
+LINKEDIN_TOKEN = os.getenv('LINKEDIN_ACCESS_TOKEN')
+LINKEDIN_PERSON_URN = os.getenv('LINKEDIN_PERSON_URN')
+
+class LinkedInAutoPoster:
+    def __init__(self):
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        })
+        
+    def get_indian_business_trends(self):
+        """Get trending business topics in India using Google Trends"""
+        try:
+            # Using public Google Trends URL (no API key needed)
+            url = "https://trends.google.com/trends/api/dailytrends"
+            params = {
+                'hl': 'en-IN',
+                'tz': '-330',
+                'geo': 'IN',
+                'ns': '15'
+            }
+            
+            response = self.session.get(url, params=params, timeout=10)
+            
+            if response.status_code == 200:
+                # Google Trends returns JSONP, need to clean it
+                content = response.text[5:]  # Remove )]}'\n
+                data = json.loads(content)
+                
+                # Extract trending searches
+                trends = []
+                for day in data.get('default', {}).get('trendingSearchesDays', []):
+                    for search in day.get('trendingSearches', []):
+                        title = search.get('title', {}).get('query', '')
+                        formatted_traffic = search.get('formattedTraffic', '')
+                        
+                        # Filter for business-related trends
+                        business_keywords = ['stock', 'market', 'business', 'economy', 
+                                           'finance', 'startup', 'investment', 'rupee',
+                                           'sensex', 'nifty', 'company', 'IPO', 'GDP',
+                                           'bank', 'trade', 'export', 'import', 'digital']
+                        
+                        if any(keyword in title.lower() for keyword in business_keywords):
+                            trends.append({
+                                'title': title,
+                                'traffic': formatted_traffic,
+                                'articles': search.get('articles', [])[:2]  # First 2 articles
+                            })
+                
+                return trends[:3]  # Return top 3 business trends
+                
+        except Exception as e:
+            print(f"Error fetching trends: {e}")
+        
+        # Fallback trends if API fails
+        return [
+            {'title': 'Indian Stock Market Trends', 'traffic': '100K+ searches', 'articles': []},
+            {'title': 'Startup Funding in India', 'traffic': '50K+ searches', 'articles': []},
+            {'title': 'Digital Economy Growth', 'traffic': '30K+ searches', 'articles': []}
+        ]
+    
+    def generate_linkedin_content(self, trend):
+        """Generate LinkedIn post using Gemini AI"""
+        try:
+            model = genai.GenerativeModel('gemini-pro')
+            
+            prompt = f"""Create a professional LinkedIn post about this trending Indian business topic:
+            
+            Trend: "{trend['title']}"
+            Search Volume: {trend.get('traffic', 'High interest')}
+            
+            Requirements:
+            1. Write an engaging caption (3-4 lines, include relevant emojis)
+            2. Add 5 relevant hashtags for Indian business audience
+            3. Include a thought-provoking question to encourage engagement
+            4. Keep tone professional but conversational
+            5. Make it suitable for LinkedIn professionals in India
+            
+            Format your response as valid JSON:
+            {{
+                "caption": "Your engaging caption here...",
+                "hashtags": ["#BusinessIndia", "#Startup", "#Economy", "#Finance", "#DigitalIndia"],
+                "question": "Your engaging question here?",
+                "source_mention": "Based on trending searches"
+            }}
+            """
+            
+            response = model.generate_content(prompt)
+            
+            # Extract JSON from response
+            response_text = response.text.strip()
+            
+            # Sometimes Gemini adds markdown code blocks
+            if '```json' in response_text:
+                response_text = response_text.split('```json')[1].split('```')[0].strip()
+            elif '```' in response_text:
+                response_text = response_text.split('```')[1].strip()
+            
+            content = json.loads(response_text)
+            
+            # Combine all parts
+            full_post = f"{content['caption']}\n\n{content['question']}\n\n{' '.join(content['hashtags'])}\n\n{content.get('source_mention', '')}"
+            
+            return {
+                'full_post': full_post,
+                'trend_title': trend['title'],
+                'hashtags': content['hashtags']
+            }
+            
+        except Exception as e:
+            print(f"Error generating content: {e}")
+            
+            # Fallback content
+            return {
+                'full_post': f"🚀 Trending in Indian Business: {trend['title']}\n\nWhat's your take on this development? Share your thoughts below! 👇\n\n#BusinessIndia #IndianEconomy #MarketTrends #StartupIndia #DigitalGrowth\n\nBased on trending searches",
+                'trend_title': trend['title'],
+                'hashtags': ['#BusinessIndia', '#IndianEconomy', '#MarketTrends', '#StartupIndia', '#DigitalGrowth']
+            }
+    
+    def create_business_meme(self, trend_title, quote):
+        """Create a professional-looking meme for LinkedIn"""
+        try:
+            # Create image with LinkedIn blue theme
+            width, height = 1200, 627  # LinkedIn recommended size
+            
+            # Create gradient background
+            img = Image.new('RGB', (width, height), color='#0077b5')
+            draw = ImageDraw.Draw(img)
+            
+            # Try to load font, fallback to default
+            try:
+                title_font = ImageFont.truetype("arial.ttf", 64)
+                quote_font = ImageFont.truetype("arial.ttf", 48)
+            except:
+                # Use default font
+                title_font = ImageFont.load_default()
+                quote_font = ImageFont.load_default()
+            
+            # Add title
+            title_text = f"🔥 TRENDING: {trend_title[:40]}{'...' if len(trend_title) > 40 else ''}"
+            title_bbox = draw.textbbox((0, 0), title_text, font=title_font)
+            title_width = title_bbox[2] - title_bbox[0]
+            title_x = (width - title_width) // 2
+            
+            draw.text((title_x, 100), title_text, fill='white', font=title_font, stroke_width=2, stroke_fill='#004471')
+            
+            # Add quote
+            lines = []
+            words = quote.split()
+            current_line = []
+            
+            for word in words:
+                test_line = ' '.join(current_line + [word])
+                bbox = draw.textbbox((0, 0), test_line, font=quote_font)
+                test_width = bbox[2] - bbox[0]
+                
+                if test_width < width - 200:  # 100px margin on each side
+                    current_line.append(word)
+                else:
+                    lines.append(' '.join(current_line))
+                    current_line = [word]
+            
+            if current_line:
+                lines.append(' '.join(current_line))
+            
+            # Draw each line
+            for i, line in enumerate(lines[:3]):  # Max 3 lines
+                bbox = draw.textbbox((0, 0), line, font=quote_font)
+                line_width = bbox[2] - bbox[0]
+                line_x = (width - line_width) // 2
+                draw.text((line_x, 250 + (i * 80)), line, fill='#f0f0f0', font=quote_font)
+            
+            # Add footer
+            draw.text((width - 300, height - 50), "#BusinessTrendsIndia", fill='#cccccc', font=quote_font)
+            
+            # Save to bytes
+            img_byte_arr = BytesIO()
+            img.save(img_byte_arr, format='PNG', quality=95)
+            img_bytes = img_byte_arr.getvalue()
+            
+            return img_bytes
+            
+        except Exception as e:
+            print(f"Error creating image: {e}")
+            # Return simple colored image as fallback
+            img = Image.new('RGB', (1200, 627), color='#0077b5')
+            img_byte_arr = BytesIO()
+            img.save(img_byte_arr, format='PNG')
+            return img_byte_arr.getvalue()
+    
+    def upload_image_to_linkedin(self, image_bytes):
+        """Upload image to LinkedIn and get URN"""
+        try:
+            # Step 1: Initialize upload
+            init_url = "https://api.linkedin.com/v2/assets?action=registerUpload"
+            init_payload = {
+                "registerUploadRequest": {
+                    "recipes": ["urn:li:digitalmediaRecipe:feedshare-image"],
+                    "owner": LINKEDIN_PERSON_URN,
+                    "serviceRelationships": [{
+                        "relationshipType": "OWNER",
+                        "identifier": "urn:li:userGeneratedContent"
+                    }]
+                }
+            }
+            
+            headers = {
+                "Authorization": f"Bearer {LINKEDIN_TOKEN}",
+                "Content-Type": "application/json",
+                "X-Restli-Protocol-Version": "2.0.0"
+            }
+            
+            init_response = requests.post(init_url, json=init_payload, headers=headers)
+            
+            if init_response.status_code == 200:
+                init_data = init_response.json()
+                upload_url = init_data['value']['uploadMechanism']['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']['uploadUrl']
+                asset_urn = init_data['value']['asset']
+                
+                # Step 2: Upload image
+                upload_headers = {
+                    "Authorization": f"Bearer {LINKEDIN_TOKEN}"
+                }
+                
+                upload_response = requests.put(
+                    upload_url,
+                    data=image_bytes,
+                    headers=upload_headers
+                )
+                
+                if upload_response.status_code in [200, 201]:
+                    return asset_urn
+                else:
+                    print(f"Image upload failed: {upload_response.status_code} - {upload_response.text}")
+            else:
+                print(f"Upload initialization failed: {init_response.status_code} - {init_response.text}")
+                
+        except Exception as e:
+            print(f"Error uploading image: {e}")
+        
+        return None
+    
+    def post_to_linkedin(self, content, image_urn):
+        """Create post on LinkedIn with image"""
+        try:
+            url = "https://api.linkedin.com/v2/ugcPosts"
+            
+            payload = {
+                "author": LINKEDIN_PERSON_URN,
+                "lifecycleState": "PUBLISHED",
+                "specificContent": {
+                    "com.linkedin.ugc.ShareContent": {
+                        "shareCommentary": {
+                            "text": content['full_post']
+                        },
+                        "shareMediaCategory": "IMAGE",
+                        "media": [
+                            {
+                                "status": "READY",
+                                "description": {
+                                    "text": f"Business Trend: {content['trend_title'][:200]}"
+                                },
+                                "media": image_urn
+                            }
+                        ]
+                    }
+                },
+                "visibility": {
+                    "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"
+                }
+            }
+            
+            headers = {
+                "Authorization": f"Bearer {LINKEDIN_TOKEN}",
+                "Content-Type": "application/json",
+                "X-Restli-Protocol-Version": "2.0.0"
+            }
+            
+            response = requests.post(url, json=payload, headers=headers)
+            
+            if response.status_code == 201:
+                print(f"✅ Post published successfully!")
+                print(f"📝 Preview: {content['full_post'][:100]}...")
+                return True
+            else:
+                print(f"❌ Post failed: {response.status_code}")
+                print(f"Response: {response.text}")
+                return False
+                
+        except Exception as e:
+            print(f"Error posting to LinkedIn: {e}")
+            return False
+    
+    def send_telegram_notification(self, success, trend_title):
+        """Send notification to Telegram (optional)"""
+        telegram_token = os.getenv('TELEGRAM_BOT_TOKEN')
+        chat_id = os.getenv('TELEGRAM_CHAT_ID')
+        
+        if telegram_token and chat_id:
+            try:
+                message = f"{'✅' if success else '❌'} LinkedIn Auto-Post\n\n"
+                message += f"Trend: {trend_title}\n"
+                message += f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                message += f"Status: {'SUCCESS' if success else 'FAILED'}"
+                
+                url = f"https://api.telegram.org/bot{telegram_token}/sendMessage"
+                requests.post(url, json={
+                    'chat_id': chat_id,
+                    'text': message,
+                    'parse_mode': 'HTML'
+                })
+            except:
+                pass  # Silent fail for notifications
+    
+    def run(self):
+        """Main execution function"""
+        print("=" * 50)
+        print(f"LinkedIn Auto Poster - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print("=" * 50)
+        
+        # 1. Get trending topics
+        print("\n📊 Fetching Indian business trends...")
+        trends = self.get_indian_business_trends()
+        
+        if not trends:
+            print("❌ No trends found. Exiting.")
+            return False
+        
+        selected_trend = trends[0]
+        print(f"✅ Selected trend: {selected_trend['title']}")
+        print(f"   Search volume: {selected_trend.get('traffic', 'N/A')}")
+        
+        # 2. Generate content
+        print("\n🤖 Generating LinkedIn content...")
+        content = self.generate_linkedin_content(selected_trend)
+        print(f"✅ Content generated: {len(content['full_post'])} characters")
+        
+        # 3. Create meme/image
+        print("\n🎨 Creating business meme...")
+        meme_quote = content['full_post'].split('\n')[0]  # Use first line as quote
+        image_bytes = self.create_business_meme(selected_trend['title'], meme_quote)
+        print(f"✅ Image created: {len(image_bytes)} bytes")
+        
+        # 4. Upload image to LinkedIn
+        print("\n⬆️ Uploading image to LinkedIn...")
+        image_urn = self.upload_image_to_linkedin(image_bytes)
+        
+        if not image_urn:
+            print("⚠️ Image upload failed. Posting without image...")
+        
+        # 5. Post to LinkedIn
+        print("\n🚀 Posting to LinkedIn...")
+        success = self.post_to_linkedin(content, image_urn)
+        
+        # 6. Send notification
+        print("\n📱 Sending notifications...")
+        self.send_telegram_notification(success, selected_trend['title'])
+        
+        print("\n" + "=" * 50)
+        print(f"Process completed: {'SUCCESS' if success else 'FAILED'}")
+        print("=" * 50)
+        
+        return success
+
+def main():
+    """Entry point"""
+    # Validate environment variables
+    required_env_vars = ['GEMINI_API_KEY', 'LINKEDIN_ACCESS_TOKEN', 'LINKEDIN_PERSON_URN']
+    missing_vars = [var for var in required_env_vars if not os.getenv(var)]
+    
+    if missing_vars:
+        print(f"❌ Missing environment variables: {', '.join(missing_vars)}")
+        print("Please add them to GitHub Secrets")
+        sys.exit(1)
+    
+    # Run the poster
+    poster = LinkedInAutoPoster()
+    success = poster.run()
+    
+    # Exit with appropriate code
+    sys.exit(0 if success else 1)
+
+if __name__ == "__main__":
+    main()
