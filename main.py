@@ -14,7 +14,7 @@ from PIL import Image, ImageDraw, ImageFont
 import google.generativeai as genai
 
 # Configure Gemini AI
-GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+client = genai.Client(api_key=GEMINI_API_KEY)
 genai.configure(api_key=GEMINI_API_KEY)
 
 # LinkedIn credentials
