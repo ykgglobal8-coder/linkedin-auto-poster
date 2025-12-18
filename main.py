@@ -29,20 +29,43 @@ class LinkedInAutoPoster:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         })
         
-    def get_indian_business_trends(self):
-        """Get trending business topics in India using Google Trends"""
-        try:
-            # Using public Google Trends URL (no API key needed)
-            url = "https://trends.google.com/trends/api/dailytrends"
-            params = {
-                'hl': 'en-IN',
-                'tz': '-330',
-                'geo': 'IN',
-                'ns': '15'
-            }
-            
-            response = self.session.get(url, params=params, timeout=10)
-            
+def get_indian_business_trends(self):
+    """Get trending business topics in India using Google Trends"""
+    try:
+        # Import pytrends here to avoid import errors if not installed
+        from pytrends.request import TrendReq
+        
+        # Initialize pytrends
+        pytrends = TrendReq(hl='en-IN', tz=330)
+        
+        # Get trending searches for India
+        trending_searches = pytrends.trending_searches(pn='india')
+        
+        # Convert to list and filter for business topics
+        business_keywords = ['stock', 'market', 'business', 'economy', 
+                           'finance', 'startup', 'investment', 'rupee',
+                           'sensex', 'nifty', 'company', 'IPO', 'GDP',
+                           'bank', 'trade', 'export', 'import', 'digital']
+        
+        trends = []
+        for search in trending_searches[0].tolist()[:10]:  # Top 10 trends
+            if any(keyword in str(search).lower() for keyword in business_keywords):
+                trends.append({
+                    'title': search,
+                    'traffic': 'Trending in India',
+                    'articles': []
+                })
+        
+        return trends[:3] if trends else [{'title': 'Indian Business Trends', 'traffic': 'Daily update', 'articles': []}]
+        
+    except Exception as e:
+        print(f"Error fetching trends with pytrends: {e}")
+        
+        # Fallback trends
+        return [
+            {'title': 'Indian Stock Market', 'traffic': 'Trending', 'articles': []},
+            {'title': 'Startup Ecosystem', 'traffic': 'Growing', 'articles': []}
+                ]
             if response.status_code == 200:
                 # Google Trends returns JSONP, need to clean it
                 content = response.text[5:]  # Remove )]}'\n
