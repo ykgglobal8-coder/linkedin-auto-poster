@@ -69,7 +69,10 @@ class LinkedInAutoPoster:
     def generate_linkedin_content(self, trend):
         """Generate LinkedIn post using Gemini AI"""
         try:
-            model = genai.GenerativeModel('gemini-pro')
+            response = client.models.generate_content(
+    model='gemini-1.5-flash',  # Use a current model
+    contents=prompt
+)
             
             prompt = f"""Create a professional LinkedIn post about this trending Indian business topic:
             
