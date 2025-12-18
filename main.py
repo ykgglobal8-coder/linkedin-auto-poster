@@ -27,6 +27,23 @@ class LinkedInAutoPoster:
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         })
+        import time
+import random
+
+def fetch_with_retry(self, pytrends_method, retries=3, delay=5, *args, **kwargs):
+    """Attempts an API call with retries on failure."""
+    for attempt in range(retries):
+        try:
+            return pytrends_method(*args, **kwargs)
+        except Exception as e:
+            print(f"Attempt {attempt + 1} failed: {e}")
+            if attempt < retries - 1:
+                wait = delay + random.uniform(0, 2)  # Add jitter
+                print(f"Retrying in {wait:.1f} seconds...")
+                time.sleep(wait)
+            else:
+                print("Max retries reached.")
+                raise e  # Re-raise the final exception
     
     def get_indian_business_trends(self):
         """Get trending business topics in India using Google Trends"""
